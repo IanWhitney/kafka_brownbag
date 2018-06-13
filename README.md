@@ -195,9 +195,51 @@ The registry adds a new benefit as well. It will prevent a Producer from evolvin
 
 ## Use Cases
 
+In my day to day work, I see many places where Kafka could be used on campus. After this brief intro you may see other options.
+
+### Live ETL
+
+We currently have dozens (hundreds?) of nightly batch jobs that copy data from one database to another. With Kafka there's the ability to copy data from Database A to Database B as soon as Database A changes. Instead of working with yesterday's data, we could be working with _now_'s data.
+
+### Event Sourcing
+
+Goldy Gohpreson logs in to MyU and changes her degree from a BA in Astrophysics to a BA in History of Science. That's an important event! And it should kick off a bunch of subsequent events, an email to the History of Science department, a notification for her advisor in APLUS, a recalculation of her degree progress in her new degree, and more.
+
+Currently the event goes unannounced, though. By announcing events in Kafka we can have a log of events that other applications can use. And it doesn't just have to be student events, either.
+
+- A host is at low memory
+- A faculty member has entered grades
+- A new ticket is in your service now queue
+
+### Metrics/Reporting
+
+How many people responded to your college's marketing email? What's the slowest query users run against your database? Feeding data in to Kafka lets you analyze these things.
+
+### Integrations
+
+Vendor A can POST you JSON, Vendor B needs that data in XML. Kafka solves these problems well. Write a Producer that puts that JSON in to Kafka as Avro. Then write a Consumer to read the data and POST it back out in XML. Thanks to Avro and schemas you can be sure that the data always has the attributes you need.
+
 ## Current Implementation
-* 3 brokers
-* Connect
-* Schema Registry
-* SSL/Plaintext
-* REST Proxy?
+
+Kafka isn't one tool, it's a collection of tools. And every implementation of Kafka will be different, meeting the needs of its customers. Here's what we currently have on campus.
+
+### A 3-broker Kafka cluster
+
+3 Kafka processes allow us to do rolling restarts, meaning zero-downtime upgrades. And it allows for one of the processes to die without any impact on the others.
+
+We have not load-tested our current brokers, but our guess is that we can handle millions of messages per day without any performance problems.
+### Distributed Kafka Connect
+
+Kafka Connect makes it easy to create Producers and Consumers that follow common patterns. Our implementation of Kafka Connect can run across multiple hosts, giving us redundancy. So far we've only had need to use a single host, but adding additional hosts should be easy.
+
+### Schema Registry
+
+A single source for Avro schema, to be used by both Producers and Schemas.
+
+### SSL or Plaintext
+
+Kafka Producers and Consumers can choose to communicate with the cluster over SSL or Plaintext. SSL is slower, but encrypts data during network transmission. We favor SSL, but there are use-cases where Plaintext makes sense.
+
+### REST Proxy?
+
+We are experimenting with the REST Proxy, which allows Producers and Consumers to communicate with Kafka over HTTP instead of over Kafka's custom TCP protocol. We are still exploring this option.
