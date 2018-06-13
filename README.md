@@ -52,7 +52,9 @@ Further details:
 
 #### Topics
 
-Data in The Log is organized in to topics.
+Data in The Log is organized in to topics. You can think of a topic like a table in a database, where all data in it has the same shape. Or you can think of a topic like a process, where the order of messages matters but the shape of each message may be different.
+
+For this demo we're going to use a table-like topic that contains student names.
 
 Demo:
 
@@ -66,7 +68,7 @@ Data in The Log can be stored for as long as you'd like. There are a few major o
 - Until the log reaches a certain size
 - Forever
 
-In our topic of student names, we could keep names "Forever" in one of two ways. We could keep every version of the student's name, or we could keep only the _most current_ version of the student's name. This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
+"Forever" can be done a couple of different ways.  In our topic of student names we could keep every version of the student's name, or we could keep only the _most current_ version of the student's name. This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
 
 Further Details:
 - [Compacted Topics]()
