@@ -54,9 +54,22 @@ Further details:
 
 Data in The Log is organized in to topics.
 
+Demo:
+
+- Create a topic for student names
+
 #### Retention
 
-Data in The Log can be stored for as long as you'd like. We'll talk more about this later on.
+Data in The Log can be stored for as long as you'd like. There are a few major options. You can retain data:
+
+- For a certain amount of time
+- Until the log reaches a certain size
+- Forever
+
+In our topic of student names, we could keep names "Forever" in one of two ways. We could keep every version of the student's name, or we could keep only the _most current_ version of the student's name. This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
+
+Further Details:
+- [Compacted Topics]()
 
 ### Producers
 
@@ -117,22 +130,71 @@ Kafka was written from the ground-up to be a fully distributed and reliable syst
 *Can Consumers read the same message multiple times?*: As with Producers, the answer is "Generally, no." When a consumer reads a message it records its 'offset' in Kafka. Think of this like a bookmark, the consumer is saying "I've read this far." If the Consumer process dies and restarts then it can pick up right where it left off. How frequently a Consumer records its offset is configurable.
 
 ## Schemas
-* Data we’ve done is simple strings
-	* Difficult to parse or manage
-	* You’ll want to use data that can be easily used in a variety of situations
-### JSON
-* Widely supported, every language has a library
-* Can introduce evolution problems
-	* What if a optional field becomes required. Or a field that you rely on goes away
-* No compression options
-### Avro
-* Includes a schema
-	* supports evolvability 
-* Has binary encoding
+
+So far we've sent strings and JSON in to Kafka, an in many cases this works well. But, let's look at how these approaches can fail.
+
+If we have a Producer that is sending student names in to Kafka we might start off with a key/message pair emplid & name. It'd look like this:
+
+```
+key: 2411242 message: Ian Whitney
+```
+
+We hit some problems right away, Consumers want to know the student's first and last name. They can _guess_ at it now, but they are frequently wrong. Names are hard (see Further Details).
+
+So, we decide to provide some structure and use JSON. We update our Producer to send messages that look like this
+
+```
+key: 2411242 message: {first_name: Ian, last_name: Whitney} 
+```
+
+Now Consumers can easily tell which is the first name and which is the last. We soon hit another problem. Some of our Consumers expect that first and last name will **always** be present. But, again, names are hard and nothing is guaranteed. So when a Producer sends through a message that has no last name, some of our Consumers break. Looks like we need a way to define what fields are required in our JSON, something like a Schema.
+
+JSON offers no official support for schemas, no way to declare which values are required or optional or what kind of data each value should contain. There is a project to develop JSON schemas, but it's a proposal, not official.
+
+If we want to use JSON schema anyway, we would need to do the following:
+
+1. Update our Producers to validate their messages against the current schema
+2. Update our Consumers to use the schema when reading data
+3. Write a system for sharing schema
+4. Figure out how we'd govern changes to schema
+
+That last one is tricky. What if we decide that `first_name` is now required? We have thousands of messages in our Kafka log that may or may not have `first_name` values.
+
+You have similar problems if you want to remove a field, or change the data type, etc. Schemas need to evolve over time and it turns out this is hard!
+
+There are a few different tools that solve this problem, but the one most commonly used in Kafka is Avro, an Apache project that supports schemas, including versioning and evolution. Also, many languages have Avro libraries that allow you to easily serialize and deserialize objects into and out of Avro encoding.
+
+I'm not going to dive deeply in to Avro, there are links in the Further Details section.
+
+### Demo
+
+- Sending and receiving a message with its schema
+
 ### Schema Registry
-* Now schemas are centrally stored
-* And each message in the log takes up even less space
+
+Having the schema included with each message introduces a few problems. It's redundant and it increases the size of The Log in Kafka, which might affect how many messages you can store and how quickly you can persist them to disk.
+
+A centralized Schema Registry solves these problems.
+
+- Producers add schemas to the registry via http
+- Messages include the schema's unique id, not the entire schema
+- Consumers can retrieve the schema from the registry via http
+
+The registry adds a new benefit as well. It will prevent a Producer from evolving a schema in an incompatible way.
+
+### Demo
+
+- Sending and receiving a message using Schema Registry
+
+### Further Details
+- [Falsehoods Programmers Believe About Names](https://www.kalzumeus.com/2010/06/17/falsehoods-programmers-believe-about-names/)
+- [JSON Schema](http://json-schema.org)
+- [Schema evolution in Avro, Protocol Buffers and Thrift](http://martin.kleppmann.com/2012/12/05/schema-evolution-in-avro-protocol-buffers-thrift.html)
+- [Avro](https://avro.apache.org)
+- [Confluent Schema Registry](https://docs.confluent.io/current/schema-registry/docs/index.html)
+
 ## Use Cases
+
 ## Current Implementation
 * 3 brokers
 * Connect
