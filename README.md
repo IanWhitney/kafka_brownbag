@@ -58,7 +58,15 @@ For this demo we're going to use a table-like topic that contains student names.
 
 Demo:
 
-- Create a topic for student names
+```
+docker-compose exec kafka kafka-topics --create --topic names --partitions 1 --replication-factor 1 --if-not-exists --zookeeper localhost:32181
+```
+
+There's a lot in that command. Some highlights:
+
+- `partitions 1` means that data will all be written to partition. Partitioning is beyond the scope of this brownbag, but it's a way to increase the speed of data input in Kafka.
+- `replication-factor 1` means that the data will only be copied to one Kafka broker. In production this would be bad, because there would be no redundancy. For this demo it's fine.
+- `zookeeper` is a part of the Kafka ecosystem. We have to tell Kafka how to communicate with Zookeeper.
 
 #### Retention
 
