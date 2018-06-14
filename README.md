@@ -78,6 +78,8 @@ Data in The Log can be stored for as long as you'd like. There are a few major o
 
 "Forever" can be done a couple of different ways.  In our topic of student names we could keep every version of the student's name, or we could keep only the _most current_ version of the student's name. This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
 
+Consumers can always read all messages that are currently in the topic.
+
 Further Details:
 - [Compacted Topics]()
 
