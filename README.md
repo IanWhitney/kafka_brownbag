@@ -156,16 +156,17 @@ kafka-console-consumer \
 
 The `--from-beginning` flag tells the Consumer to begin at the start of the topic, otherwise it will only read new messages.
 
-If we then open up another shell and run
+If we go back to our producer console and add a new message
 
 ```
-kafka-console-producer \
---broker-list localhost:29092 \
---topic test
 #>Data appears quickly
 ```
 
 Then we will see that message appear over in our Consumer shell.
+
+```
+#Data appears quickly
+```
 
 Further details: 
 - [Kafka Consumers: Reading Data from Kafka](https://www.safaribooksonline.com/library/view/kafka-the-definitive/9781491936153/ch04.html)
@@ -218,12 +219,23 @@ So far we've sent strings and JSON in to Kafka, an in many cases this works well
 For this demo, we're going to create a new topic. We want this topic to contain student names. Each message will have a key -- the student's emplid -- and their preferred name.
 
 ```
+kafka-topics --create \
+--topic names \
+--partitions 1 \
+--replication-factor 1 \
+--if-not-exists \
+--zookeeper zookeeper:2181
 ```
 
 We could send data in to this topic as a simple string, using some extra configuration to let us declare our message's key.
 
 ```
->2411242:Ian Whitney
+kafka-console-producer \
+--broker-list kafka:9092 \
+--topic names \
+--property parse.key=true \
+--property key.separator=":"
+#>2411242:Ian Whitney
 ```
 
 This works, but we hit some problems right away, Consumers want to know the student's first and last name. They can _guess_ at it now, but they are frequently wrong. Names are hard (see Further Details).
@@ -231,7 +243,7 @@ This works, but we hit some problems right away, Consumers want to know the stud
 So, we decide to provide some structure and use JSON. Using our same Producer as above:
 
 ```
-2411242:{"first_name": "Ian", "last_name": "Whitney"}
+#>2411242:{"first_name": "Ian", "last_name": "Whitney"}
 ```
 
 Now Consumers can easily tell which is the first name and which is the last. We soon hit another problem. Some of our Consumers expect that first and last name will **always** be present. But, again, names are hard and nothing is guaranteed. So when a Producer sends through a message that has no last name, some of our Consumers break. Looks like we need a way to define what fields are required in our JSON, something like a Schema.
@@ -255,7 +267,62 @@ I'm not going to dive deeply in to the details of Avro, there are links in the F
 
 Demo
 
-- Sending and receiving a message with its schema
+We're going to create a new producer for our `names` topic. This one includes two schemas.
+
+First, a `key.schema` that says our key is a string.
+
+Second, the `value.schema` declares that messages must have both first and last attributes and that both are strings.
+
+```
+kafka-avro-console-producer \
+  --broker-list kafka:9092 \
+  --topic names \
+  --property schema.registry.url=http://schema-registry:8081 \
+  --property key.separator=":" \
+  --property parse.key=true \
+  --property key.schema='{"type":"string"}' \
+  --property value.schema='{"type":"record","name":"PreferredName","fields":[ {"name": "first", "type": "string"}, {"name": "last", "type": "string"}]}'
+```
+
+With that running we can send a message that follows the schema:
+
+```
+"2411242":{"first": "Ian", "last": "Whitney"}
+```
+
+But if we try to send a message that violates the schema, it fails
+
+```
+#"2411242":{"first": "Ian"}
+# org.apache.kafka.common.errors.SerializationException: Error deserializing json {"first": "Ian"} to Avro of schema {"type":"record","name":"PreferredName","fields":[{"name":"first","type":"string"},{"name":"last","type":"string"}]}
+```
+
+Let's take a look at our message. We can do this two different ways. First, we could use our plain Consumer that we were using for messages that didn't have schemas:
+
+```
+kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic names \
+  --property print.key=true \
+  --property key.separator=":" \
+  --from-beginning
+#2411242:IanWhitney
+```
+
+Or we can use a new Consumer that works with Avro messages:
+
+```
+kafka-avro-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic names \
+  --from-beginning \
+  --property print.key=true \
+  --property key.separator=":" \
+  --property schema.registry.url=http://schema-registry:8081
+#"2411242":{"first":"Ian","last":"Whitney"}
+```
+
+Why do we get different responses. And what is this Schema Registry? 
 
 Further Details
 - [Avro]
@@ -263,10 +330,28 @@ Further Details
 
 ### Schema Registry
 
-Having the schema included with each message introduces a few problems. It's redundant and it increases the size of The Log in Kafka, which might affect how many messages you can store and how quickly you can persist them to disk.
+When you send an Avro-encoded message you can include the encoding schema with every single message. In the Kafka topic, the message ends up looking like:
+
+```
+schema:{
+  "type":"record",
+  "name":"PreferredName",
+  "fields":[
+    {"name":"first","type":"string"},
+    {"name":"last","type":"string"}
+  ]
+},
+value:{
+  "first":"Ian",
+  "last":"Whitney"
+}
+```
+
+This works, but it introduces a few problems. First, schemas don't change all that often, so including it with every message is redundant. And it increases the size of each message, which might affect how many messages you can store and how quickly they can be saved. The schema in our example is quite small, but imagine the complexity with larger schemas.
 
 A centralized Schema Registry solves these problems.
 
+- When Kafka reci
 - Producers add schemas to the registry via http
 - Messages include the schema's unique id, not the entire schema
 - Consumers can retrieve the schema from the registry via http

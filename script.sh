@@ -65,6 +65,9 @@ docker exec -i -t kafka /bin/bash
 # Do this in the session created in the previous step
 # This starts a running process that shows messages as they arrive.
 # ctrl-c to quit the process
+docker run \
+--net=confluent \
+--rm confluentinc/cp-kafka:4.1.0 \
 kafka-console-consumer \
 --bootstrap-server kafka:9092 \
 --topic test \
@@ -95,6 +98,65 @@ kafka-console-producer \
 --topic names \
 --property parse.key=true \
 --property key.separator=":"
+
+# Create a shell session in our Kafka network
+docker exec -i -t kafka /bin/bash
+
+## Schemas: Avro
+
+# This sets up a Schema Registry instance in our Docker network
+docker run -d \
+  --net=confluent \
+  --name=schema-registry \
+  -e SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL=zookeeper:2181 \
+  -e SCHEMA_REGISTRY_HOST_NAME=schema-registry \
+  -e SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081 \
+  confluentinc/cp-schema-registry:4.1.0
+
+## Create a shell in Schema Registry
+docker run -it --net=confluent --rm confluentinc/cp-schema-registry:4.1.0 bash
+
+# Producer to send messages using Avro schema
+# Do this in the session created in the previous step
+# This starts an interactive console. Type a message & hit enter to send.
+# ctrl-c to quit the console
+kafka-avro-console-producer \
+  --broker-list kafka:9092 \
+  --topic names \
+  --property schema.registry.url=http://schema-registry:8081 \
+  --property key.separator=":" \
+  --property parse.key=true \
+  --property key.schema='{"type":"string"}' \
+  --property value.schema='{"type":"record","name":"PreferredName","fields":[ {"name": "first", "type": "string"}, {"name": "last", "type": "string"}]}'
+
+#Example good message:
+#"2411242":{"first": "Ian", "last": "Whitney"}
+
+#Example bad message:
+#"2411242":{"first": "Ian"}
+
+#Read a raw Avro message
+docker run \
+  --net=confluent \
+  --rm confluentinc/cp-kafka:4.1.0 \
+  kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic names \
+  --property print.key=true \
+  --property key.separator=":" \
+  --from-beginning
+
+#Read and decode a Avro message
+docker run \
+--net=confluent \
+--rm confluentinc/cp-schema-registry:4.1.0 \
+kafka-avro-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic names \
+  --from-beginning \
+  --property print.key=true \
+  --property key.separator=":" \
+  --property schema.registry.url=http://schema-registry:8081
 
 # Cleanup
 # Do this at the end to clean up all the Docker Network stuff.
