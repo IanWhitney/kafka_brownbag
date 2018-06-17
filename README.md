@@ -59,10 +59,9 @@ For this quick introduction demo we're going to use a topic imaginatively named 
 
 Demo:
 
+Note: For the sake of focusing on Kafka I'm omitting some Docker commands from all of these examples. The full commands are in [`script.sh`](script.sh)
+
 ```
-docker run \
---net=confluent \
---rm confluentinc/cp-kafka:4.1.0 \
 kafka-topics --create \
 --topic test \
 --partitions 1 \
@@ -78,14 +77,6 @@ There's a lot in that command. Some highlights:
 - `zookeeper` is a part of the Kafka ecosystem. We have to tell Kafka how to communicate with Zookeeper.
 
 We can then ask Kafka for a list of our topics, just to make sure this worked
-
-Note: From this point on I'm going to leave out this part of each command
-
-```
-docker run \
---net=confluent \
---rm confluent/cp-kafka:4.1.0
-```
 
 ```
 kafka-topics --list \
@@ -113,31 +104,34 @@ We won't be diving in to Connect during this brownbag, but there are links in th
 
 Demo:
 
-We can send messages to our `test` topic in a variety of formats. 
+We can send messages to our `test` topic in a variety of formats. We start a producer with
 
-Plain strings:
 ```
 kafka-console-producer \
 --broker-list localhost:29092 \
---topic names
-#>test message
-#>^C
+--topic test
 ```
 
-JSON:
+Which gives us a console where we can type messages and send them by hitting Enter.
+
+We can send a plain string:
 ```
-kafka-console-producer \
---broker-list localhost:29092 \
---topic names
-#>{"json": "is neat"}
-#>^C
+>test message
 ```
-Further details: 
+
+Or JSON:
+```
+>{"json": "is neat"}
+```
+
+`ctrl-c` will end the producer console. But we'll leave it running for now so that we can see Producers and Consumers in action later on.
+
+Further details:
 - [Kafka Producer Architecture](https://dzone.com/articles/kafka-producer-architecture-picking-the-partition)
 - [Announcing Kafka Connect](https://www.confluent.io/blog/announcing-kafka-connect-building-large-scale-low-latency-data-pipelines/)
 - [Confluent: Kafka Connect](https://docs.confluent.io/current/connect/index.html)
 
-### Consumer
+### Consumers
 
 Consumers read messages from a Topic in Kafka. As with Producers, Consumers can connect directly to Kafka or they can use a HTTP proxy. What Consumers do with the messages is going to be up to each Consumer.
 
@@ -149,17 +143,12 @@ Kafka Connect also provides an API for common Consumer patterns. With Connect yo
 - Files
 - Message Queues
 
-Further details: 
-- [Kafka Consumers: Reading Data from Kafka](https://www.safaribooksonline.com/library/view/kafka-the-definitive/9781491936153/ch04.html)
-- [Announcing Kafka Connect](https://www.confluent.io/blog/announcing-kafka-connect-building-large-scale-low-latency-data-pipelines/)
-- [Confluent: Kafka Connect](https://docs.confluent.io/current/connect/index.html)
-
 Demo
 
 ```
 kafka-console-consumer \
 --bootstrap-server localhost:29092 \
---topic names \
+--topic test \
 --from-beginning
 #test message
 #{"json": "is neat"}
@@ -172,11 +161,16 @@ If we then open up another shell and run
 ```
 kafka-console-producer \
 --broker-list localhost:29092 \
---topic names
+--topic test
 #>Data appears quickly
 ```
 
 Then we will see that message appear over in our Consumer shell.
+
+Further details: 
+- [Kafka Consumers: Reading Data from Kafka](https://www.safaribooksonline.com/library/view/kafka-the-definitive/9781491936153/ch04.html)
+- [Announcing Kafka Connect](https://www.confluent.io/blog/announcing-kafka-connect-building-large-scale-low-latency-data-pipelines/)
+- [Confluent: Kafka Connect](https://docs.confluent.io/current/connect/index.html)
 
 #### Retention
 
@@ -188,7 +182,7 @@ There are a few major retention options. You can retain data:
 - Until the topic reaches a certain size
 - Forever
 
-"Forever" can be done a couple of different ways.  In our topic of student names we could keep every version of the student's name, or we could keep only the _most current_ version of the student's name. This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
+TODO: improve example since names is no longer introduced at this point. "Forever" can be done a couple of different ways.  In our topic of student names we could keep every version of the student's name, or we could keep only the _most current_ version of the student's name. This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
 
 Further Details:
 - [Compacted Topics](https://dzone.com/articles/kafka-architecture-log-compaction)
@@ -224,21 +218,15 @@ So far we've sent strings and JSON in to Kafka, an in many cases this works well
 For this demo, we're going to create a new topic. We want this topic to contain student names. Each message will have a key -- the student's emplid -- and their preferred name.
 
 ```
-docker-compose exec kafka kafka-topics --create --topic names --partitions 1 --replication-factor 1 --if-not-exists --zookeeper localhost:32181
 ```
 
 We could send data in to this topic as a simple string, using some extra configuration to let us declare our message's key.
 
 ```
-docker-compose exec kafka kafka-console-producer \n
---broker-list localhost:29092 \n
---topic names \n
---property key.separator=":" \n
---property parse.key=true
 >2411242:Ian Whitney
 ```
 
-This works, but We hit some problems right away, Consumers want to know the student's first and last name. They can _guess_ at it now, but they are frequently wrong. Names are hard (see Further Details).
+This works, but we hit some problems right away, Consumers want to know the student's first and last name. They can _guess_ at it now, but they are frequently wrong. Names are hard (see Further Details).
 
 So, we decide to provide some structure and use JSON. Using our same Producer as above:
 
@@ -263,11 +251,15 @@ You have similar problems if you want to remove a field, or change the data type
 
 There are a few different tools that solve this problem, but the one most commonly used in Kafka is Avro, an Apache project that supports schemas, including versioning and evolution. Also, many languages have Avro libraries that allow you to easily serialize and deserialize objects into and out of Avro encoding.
 
-I'm not going to dive deeply in to Avro, there are links in the Further Details section.
+I'm not going to dive deeply in to the details of Avro, there are links in the Further Details section.
 
 Demo
 
 - Sending and receiving a message with its schema
+
+Further Details
+- [Avro]
+- [Schema Evolution]
 
 ### Schema Registry
 
