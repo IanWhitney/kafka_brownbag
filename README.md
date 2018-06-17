@@ -2,7 +2,7 @@
 
 ## Setup
 
-In the examples below I'll be using the [Confluent Docker environment](https://docs.confluent.io/current/installation/docker/docs/quickstart.html#getting-started-with-docker-compose). This provides a running Confluent Kafka system using Docker.
+In the examples below I'll be using the [Confluent Docker Network environment](https://docs.confluent.io/current/installation/docker/docs/quickstart.html#docker-network). This provides a running Confluent Kafka system using Docker.
 
 I'm running Docker using Docker for Mac.
 
@@ -36,7 +36,7 @@ At the end of the session I'll consider it a success if you:
 
 ## General Concepts
 
-**Producers** send data to Kafka, which then writes the data to **The Log**. Later, **Consumers** can read that data in the same order in which it was sent.
+**Producers** send data to Kafka, which then writes the data to a **Topic** in **The Log**. Later, **Consumers** can read that data in the same order in which it was sent.
 
 ### The Log
 
@@ -49,39 +49,53 @@ These two things combine to make The Log very useful and powerful. If you write 
 
 Further details: 
 - [The Log: What every software engineer should know about real-time data's unifying abstraction](https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying)
+- [Turning the Database Inside Out](https://martin.kleppmann.com/2015/03/04/turning-the-database-inside-out.html)
 
 #### Topics
 
 Data in The Log is organized in to topics. You can think of a topic like a table in a database, where all data in it has the same shape. Or you can think of a topic like a process, where the order of messages matters but the shape of each message may be different.
 
-For this demo we're going to use a table-like topic that contains student names.
+For this quick introduction demo we're going to use a topic imaginatively named "test"
 
 Demo:
 
 ```
-docker-compose exec kafka kafka-topics --create --topic names --partitions 1 --replication-factor 1 --if-not-exists --zookeeper localhost:32181
+docker run \
+--net=confluent \
+--rm confluentinc/cp-kafka:4.1.0 \
+kafka-topics --create \
+--topic test \
+--partitions 1 \
+--replication-factor 1 \
+--if-not-exists \
+--zookeeper localhost:32181
 ```
 
 There's a lot in that command. Some highlights:
 
-- `partitions 1` means that data will all be written to partition. Partitioning is beyond the scope of this brownbag, but it's a way to increase the speed of data input in Kafka.
-- `replication-factor 1` means that the data will only be copied to one Kafka broker. In production this would be bad, because there would be no redundancy. For this demo it's fine.
+- `partitions 1` means that data will all be written to one partition. Partitioning is beyond the scope of this brownbag, but it's a way to increase the speed of data input in Kafka.
+- `replication-factor 1` means that the data will only be stored by one Kafka broker. In production this would be bad, because there would be no redundancy. For this demo it's fine.
 - `zookeeper` is a part of the Kafka ecosystem. We have to tell Kafka how to communicate with Zookeeper.
 
-#### Retention
+We can then ask Kafka for a list of our topics, just to make sure this worked
 
-Data in The Log can be stored for as long as you'd like. There are a few major options. You can retain data:
+Note: From this point on I'm going to leave out this part of each command
 
-- For a certain amount of time
-- Until the log reaches a certain size
-- Forever
+```
+docker run \
+--net=confluent \
+--rm confluent/cp-kafka:4.1.0
+```
 
-"Forever" can be done a couple of different ways.  In our topic of student names we could keep every version of the student's name, or we could keep only the _most current_ version of the student's name. This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
+```
+kafka-topics --list \
+--zookeeper localhost:32181
+```
 
-Consumers can always read all messages that are currently in the topic.
+`test` should appear in the list returned. There may be some others. Anything that starts with `__` is an internal topic used by Kafka.
 
 Further Details:
-- [Compacted Topics]()
+- [Apache Kafka: Topics and Logs](http://kafka.apache.org/intro#intro_topics)
 
 ### Producers
 
@@ -95,21 +109,39 @@ Kafka provides a high-level API for common Producer patterns called Kafka Connec
 - Files
 - Message Queues
 
-We won't be diving in to Connect during this browbag, but there are links in the Further Details section.
+We won't be diving in to Connect during this brownbag, but there are links in the Further Details section.
 
+Demo:
+
+We can send messages to our `test` topic in a variety of formats. 
+
+Plain strings:
+```
+kafka-console-producer \
+--broker-list localhost:29092 \
+--topic names
+#>test message
+#>^C
+```
+
+JSON:
+```
+kafka-console-producer \
+--broker-list localhost:29092 \
+--topic names
+#>{"json": "is neat"}
+#>^C
+```
 Further details: 
-- []()
-
-Demo
-- Send a plain string
-- Send json
-- Send something with a Key
+- [Kafka Producer Architecture](https://dzone.com/articles/kafka-producer-architecture-picking-the-partition)
+- [Announcing Kafka Connect](https://www.confluent.io/blog/announcing-kafka-connect-building-large-scale-low-latency-data-pipelines/)
+- [Confluent: Kafka Connect](https://docs.confluent.io/current/connect/index.html)
 
 ### Consumer
 
 Consumers read messages from a Topic in Kafka. As with Producers, Consumers can connect directly to Kafka or they can use a HTTP proxy. What Consumers do with the messages is going to be up to each Consumer.
 
-Kafka Connect also provides an API for common Consumer patterns. With Connect you can create Consumers that take data from Kafka and put it into
+Kafka Connect also provides an API for common Consumer patterns. With Connect you can create Consumers that take data from Kafka and put it into:
 
 - Databases
 - S3
@@ -118,11 +150,48 @@ Kafka Connect also provides an API for common Consumer patterns. With Connect yo
 - Message Queues
 
 Further details: 
-- []()
+- [Kafka Consumers: Reading Data from Kafka](https://www.safaribooksonline.com/library/view/kafka-the-definitive/9781491936153/ch04.html)
+- [Announcing Kafka Connect](https://www.confluent.io/blog/announcing-kafka-connect-building-large-scale-low-latency-data-pipelines/)
+- [Confluent: Kafka Connect](https://docs.confluent.io/current/connect/index.html)
 
 Demo
-- Consume the topic we built in the first demo
-- Show live message sending from producer to consumer
+
+```
+kafka-console-consumer \
+--bootstrap-server localhost:29092 \
+--topic names \
+--from-beginning
+#test message
+#{"json": "is neat"}
+```
+
+The `--from-beginning` flag tells the Consumer to begin at the start of the topic, otherwise it will only read new messages.
+
+If we then open up another shell and run
+
+```
+kafka-console-producer \
+--broker-list localhost:29092 \
+--topic names
+#>Data appears quickly
+```
+
+Then we will see that message appear over in our Consumer shell.
+
+#### Retention
+
+Data in a topic can be stored for as long as you'd like. And any Consumer can read all data in a topic, regardless of if another Consumer has read it or how old the data is.
+
+There are a few major retention options. You can retain data:
+
+- For a certain amount of time
+- Until the topic reaches a certain size
+- Forever
+
+"Forever" can be done a couple of different ways.  In our topic of student names we could keep every version of the student's name, or we could keep only the _most current_ version of the student's name. This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
+
+Further Details:
+- [Compacted Topics](https://dzone.com/articles/kafka-architecture-log-compaction)
 
 ### Reliability
 
@@ -137,26 +206,44 @@ Kafka was written from the ground-up to be a fully distributed and reliable syst
 
 *What happens if a Kafka process dies?*: Kafka processes are run in 'clusters' with a leader and many followers. If a process dies, the remaining members of the cluster continue to handle the load. If the leader dies, a new leader is elected. If a majority of the processes die then the cluster stops accepting new messages.
 
-*Can Producers send messages that are not logged?*: Generally, no. Producers can choose how strict they want to be. By default they wait for confirmation that at least one Kafka process has received a message. You can be more strict, or less. This approach is generally true in Kafka, you can configure your Producers and Consumers for different reliability guarantees.
+*Can Producers send messages that are not logged?*: Generally, no. Producers can choose how strict they want to be. By default they wait for confirmation that at least one Kafka process has received a message before sending another. You can be more strict, or less. For example, you can configure a Producer to not wait for confirmation at all. This makes sense for Producers that are concerned with throughput over reliability. Or you can configure your Producer to wait for 3 confirmations before proceeding; your throughput will suffer, but no messages will be lost.
 
-*Can Consumers read the same message multiple times?*: As with Producers, the answer is "Generally, no." When a consumer reads a message it records its 'offset' in Kafka. Think of this like a bookmark, the consumer is saying "I've read this far." If the Consumer process dies and restarts then it can pick up right where it left off. How frequently a Consumer records its offset is configurable.
+This approach is generally true in Kafka -- you can tune Producers and Consumers to balance between throughput and reliability 
+
+*Can Consumers read the same message multiple times?*: As with Producers, the answer is "Generally, no." When a consumer reads a message it records its 'offset' in Kafka. Think of this like a bookmark, the consumer is saying "I've read this far." If the Consumer process dies and restarts then it can pick up right where it left off.
+
+How frequently a Consumer records its offset is configurable. A Consumer that doesn't care if it accidentally reads a message twice can record its offsets less frequently. This will allow it to read messages more quickly. A Consumer that wants to read each message once can record its offset after every message. This Consumer will read more slowly, but with a guarantee that each message will be read once.
+
+Further Details:
+- [Best Practices for Apache Kafka in Production](https://www.confluent.io/online-talk/best-practices-for-apache-kafka-in-production-confluent-online-talk-series)
 
 ## Schemas
 
-So far we've sent strings and JSON in to Kafka, an in many cases this works well. But, let's look at how these approaches can fail.
+So far we've sent strings and JSON in to Kafka, an in many cases this works well. But not always! Let's look at some drawbacks.
 
-If we have a Producer that is sending student names in to Kafka we might start off with a key/message pair emplid & name. It'd look like this:
-
-```
-key: 2411242 message: Ian Whitney
-```
-
-We hit some problems right away, Consumers want to know the student's first and last name. They can _guess_ at it now, but they are frequently wrong. Names are hard (see Further Details).
-
-So, we decide to provide some structure and use JSON. We update our Producer to send messages that look like this
+For this demo, we're going to create a new topic. We want this topic to contain student names. Each message will have a key -- the student's emplid -- and their preferred name.
 
 ```
-key: 2411242 message: {first_name: Ian, last_name: Whitney} 
+docker-compose exec kafka kafka-topics --create --topic names --partitions 1 --replication-factor 1 --if-not-exists --zookeeper localhost:32181
+```
+
+We could send data in to this topic as a simple string, using some extra configuration to let us declare our message's key.
+
+```
+docker-compose exec kafka kafka-console-producer \n
+--broker-list localhost:29092 \n
+--topic names \n
+--property key.separator=":" \n
+--property parse.key=true
+>2411242:Ian Whitney
+```
+
+This works, but We hit some problems right away, Consumers want to know the student's first and last name. They can _guess_ at it now, but they are frequently wrong. Names are hard (see Further Details).
+
+So, we decide to provide some structure and use JSON. Using our same Producer as above:
+
+```
+2411242:{"first_name": "Ian", "last_name": "Whitney"}
 ```
 
 Now Consumers can easily tell which is the first name and which is the last. We soon hit another problem. Some of our Consumers expect that first and last name will **always** be present. But, again, names are hard and nothing is guaranteed. So when a Producer sends through a message that has no last name, some of our Consumers break. Looks like we need a way to define what fields are required in our JSON, something like a Schema.
@@ -178,7 +265,7 @@ There are a few different tools that solve this problem, but the one most common
 
 I'm not going to dive deeply in to Avro, there are links in the Further Details section.
 
-### Demo
+Demo
 
 - Sending and receiving a message with its schema
 
@@ -219,9 +306,9 @@ Goldy Gohpreson logs in to MyU and changes her degree from a BA in Astrophysics 
 
 Currently the event goes unannounced, though. By announcing events in Kafka we can have a log of events that other applications can use. And it doesn't just have to be student events, either.
 
-- A host is at low memory
 - A faculty member has entered grades
 - A new ticket is in your service now queue
+- Syslog alerts
 
 ### Metrics/Reporting
 
@@ -255,3 +342,13 @@ Kafka Producers and Consumers can choose to communicate with the cluster over SS
 ### REST Proxy?
 
 We are experimenting with the REST Proxy, which allows Producers and Consumers to communicate with Kafka over HTTP instead of over Kafka's custom TCP protocol. We are still exploring this option.
+
+## Not Yet Implemented
+
+So far we've implemented the parts of Kafka we need. But there are other tools that we have not yet turned on.
+
+### Authentication
+
+### Authorization
+
+### KSQL
