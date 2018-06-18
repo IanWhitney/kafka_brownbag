@@ -127,15 +127,19 @@ kafka-avro-console-producer \
   --property key.separator=":" \
   --property parse.key=true \
   --property key.schema='{"type":"string"}' \
-  --property value.schema='{"type":"record","name":"PreferredName","fields":[ {"name": "first", "type": "string"}, {"name": "last", "type": "string"}]}'
+  --property value.schema='{"type":"record","name":"PreferredName","fields":[{"name":"first","type":["null","string"],"default":null},{"name":"last","type":["null","string"],"default":null}]}'
 
 #Example good message:
-#"2411242":{"first": "Ian", "last": "Whitney"}
+#"2411242":{"first": {"string": "Ian"}, "last": {"string": "Whitney}}
+#"2411242":{"first": null, "last": {"string": "Whitney}}
+#"2411242":{"first": {"string": "Ian"}, "last": null}
+#"2411242":{"first": null, "last": null}
 
 #Example bad message:
-#"2411242":{"first": "Ian"}
+#"2411242":{"last": null}
 
 #Read a raw Avro message
+#Run this from your own terminal
 docker run \
   --net=confluent \
   --rm confluentinc/cp-kafka:4.1.0 \
@@ -147,6 +151,7 @@ docker run \
   --from-beginning
 
 #Read and decode a Avro message
+#Run this from your own terminal
 docker run \
 --net=confluent \
 --rm confluentinc/cp-schema-registry:4.1.0 \
@@ -157,6 +162,24 @@ kafka-avro-console-consumer \
   --property print.key=true \
   --property key.separator=":" \
   --property schema.registry.url=http://schema-registry:8081
+
+## Create a shell in Schema Registry
+docker run -it --net=confluent --rm confluentinc/cp-schema-registry:4.1.0 bash
+
+# Producer with an invalid schema
+kafka-avro-console-producer \
+  --broker-list kafka:9092 \
+  --topic names \
+  --property schema.registry.url=http://schema-registry:8081 \
+  --property key.separator=":" \
+  --property parse.key=true \
+  --property key.schema='{"type":"string"}' \
+  --property value.schema=
+  
+curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{"schema": "{\"type\":\"record\",\"name\":\"StudentName\",\"fields\":[{\"name\": \"first\",\"type\": \"string\"},{\"name\": \"last\",\"type\": [\"null\",\"string\"],\"default\": null}]}"}' \
+http://schema-registry:8081/compatibility/subjects/names-value/versions/latest
+
 
 # Cleanup
 # Do this at the end to clean up all the Docker Network stuff.

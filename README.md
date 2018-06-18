@@ -214,7 +214,7 @@ Further Details:
 
 ## Schemas
 
-So far we've sent strings and JSON in to Kafka, an in many cases this works well. But not always! Let's look at some drawbacks.
+So far we've sent strings and JSON in to Kafka, an in many cases this works well. But not always! Let's look at some pitfalls.
 
 For this demo, we're going to create a new topic. We want this topic to contain student names. Each message will have a key -- the student's emplid -- and their preferred name.
 
@@ -227,7 +227,7 @@ kafka-topics --create \
 --zookeeper zookeeper:2181
 ```
 
-We could send data in to this topic as a simple string, using some extra configuration to let us declare our message's key.
+We can send data in to this topic as a simple string, using some extra configuration that allows us to include the key.
 
 ```
 kafka-console-producer \
@@ -238,7 +238,7 @@ kafka-console-producer \
 #>2411242:Ian Whitney
 ```
 
-This works, but we hit some problems right away, Consumers want to know the student's first and last name. They can _guess_ at it now, but they are frequently wrong. Names are hard (see Further Details).
+This works, but we hit a problem right away --  Consumers want to know the student's first and last name. They can _guess_ at it now, but they are frequently wrong. Names are hard (see Further Details).
 
 So, we decide to provide some structure and use JSON. Using our same Producer as above:
 
@@ -246,9 +246,11 @@ So, we decide to provide some structure and use JSON. Using our same Producer as
 #>2411242:{"first_name": "Ian", "last_name": "Whitney"}
 ```
 
-Now Consumers can easily tell which is the first name and which is the last. We soon hit another problem. Some of our Consumers expect that first and last name will **always** be present. But, again, names are hard and nothing is guaranteed. So when a Producer sends through a message that has no last name, some of our Consumers break. Looks like we need a way to define what fields are required in our JSON, something like a Schema.
+Now Consumers can read the message, parse it as JSON and easily tell which is the first name and which is the last. Great! 
 
-JSON offers no official support for schemas, no way to declare which values are required or optional or what kind of data each value should contain. There is a project to develop JSON schemas, but it's a proposal, not official.
+But. We soon hit another problem. Some of our Consumers expect that first and last name will **always** be present. But, again, names are hard and nothing is guaranteed. So when a Producer sends through a message that has no last name, some of our Consumers break. Looks like we need a way to define what fields are required in our JSON, something like a Schema.
+
+JSON offers no official support for schemas, no way to declare which values are required or optional or what kind of data each value should contain. There is a project to develop JSON schemas but it's a proposal, not official.
 
 If we want to use JSON schema anyway, we would need to do the following:
 
@@ -257,21 +259,52 @@ If we want to use JSON schema anyway, we would need to do the following:
 3. Write a system for sharing schema
 4. Figure out how we'd govern changes to schema
 
-That last one is tricky. What if we decide that `first_name` is now required? We have thousands of messages in our Kafka log that may or may not have `first_name` values.
+That last one is tricky. Imagine we start with a schema that declares both `last_name` and `first_name` optional. Then, after producing thousands of messages, we update our schema to declare that `first_name` is now *required* while `last_name` is optional? We have thousands of messages in our Kafka log that may or may not have `first_name` values. Are those messages now invalid?
 
-You have similar problems if you want to remove a field, or change the data type, etc. Schemas need to evolve over time and it turns out this is hard!
+Schemas need to evolve over time and it turns out this is hard!
 
-There are a few different tools that solve this problem, but the one most commonly used in Kafka is Avro, an Apache project that supports schemas, including versioning and evolution. Also, many languages have Avro libraries that allow you to easily serialize and deserialize objects into and out of Avro encoding.
+There are a few different tools that solve this problem, but the one most commonly used in Kafka is Avro, an Apache project for data schemas, including their versioning and evolution. Many languages have Avro libraries that allow you to easily serialize and deserialize objects into and out of Avro encoding.
 
-I'm not going to dive deeply in to the details of Avro, there are links in the Further Details section.
+I'm not going to dive deeply in to the details of Avro, there are links in the Further Details section. But we can see it in action with our Student Names topic:
 
-Demo
+### Demo
 
 We're going to create a new producer for our `names` topic. This one includes two schemas.
 
 First, a `key.schema` that says our key is a string.
 
-Second, the `value.schema` declares that messages must have both first and last attributes and that both are strings.
+```
+{"type":"string"}
+```
+
+Second, the `value.schema` declares that messages can have both first and last name strings, but that they are optional:
+
+```
+{
+  "type":"record",
+  "name":"StudentName",
+  "fields":[
+    {
+      "name": "first",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "last",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    }
+  ]
+}
+```
+
+We create a producer with all of the necessary configuration:
 
 ```
 kafka-avro-console-producer \
@@ -281,23 +314,26 @@ kafka-avro-console-producer \
   --property key.separator=":" \
   --property parse.key=true \
   --property key.schema='{"type":"string"}' \
-  --property value.schema='{"type":"record","name":"PreferredName","fields":[ {"name": "first", "type": "string"}, {"name": "last", "type": "string"}]}'
+  --property value.schema='{"type":"record","name":"StudentName","fields":[{"name":"first","type":["null","string"],"default":null},{"name":"last","type":["null","string"],"default":null}]}'
 ```
 
 With that running we can send a message that follows the schema:
 
 ```
-"2411242":{"first": "Ian", "last": "Whitney"}
+"2411242":{"first": {"string": "Ian"}, "last": {"string": "Whitney}}
+"2411242":{"first": null, "last": {"string": "Whitney}}
+"2411242":{"first": {"string": "Ian"}, "last": null}
+"2411242":{"first": null, "last": null}
 ```
 
 But if we try to send a message that violates the schema, it fails
 
 ```
-#"2411242":{"first": "Ian"}
-# org.apache.kafka.common.errors.SerializationException: Error deserializing json {"first": "Ian"} to Avro of schema {"type":"record","name":"PreferredName","fields":[{"name":"first","type":"string"},{"name":"last","type":"string"}]}
+"2411242":{"last": null}
+org.apache.kafka.common.errors.SerializationException: Error deserializing json {"last": null} to Avro of schema {"type":"record","name":"StudentName","fields":[{"name":"first","type":["null","string"],"default":null},{"name":"last","type":["null","string"],"default":null}]}
 ```
 
-Let's take a look at our message. We can do this two different ways. First, we could use our plain Consumer that we were using for messages that didn't have schemas:
+Let's take a look at the messages we've written to this topic. We can do this two different ways. First, we could use our plain Consumer that we were using for messages that didn't have schemas:
 
 ```
 kafka-console-consumer \
@@ -307,6 +343,9 @@ kafka-console-consumer \
   --property key.separator=":" \
   --from-beginning
 #2411242:IanWhitney
+#2411242:Whitney
+#2411242:Ian
+#2411242:
 ```
 
 Or we can use a new Consumer that works with Avro messages:
@@ -319,10 +358,13 @@ kafka-avro-console-consumer \
   --property print.key=true \
   --property key.separator=":" \
   --property schema.registry.url=http://schema-registry:8081
-#"2411242":{"first":"Ian","last":"Whitney"}
+"2411242":{"first":{"string":"Ian"},"last":{"string":"Whitney"}}
+"2411242":{"first":null,"last":{"string":"Whitney"}}
+"2411242":{"first":{"string":"Ian"},"last":null}
+"2411242":{"first":null,"last":null}
 ```
 
-Why do we get different responses. And what is this Schema Registry? 
+Why do we get different responses? And what is this Schema Registry parameter we keep passing in?
 
 Further Details
 - [Avro]
@@ -335,10 +377,10 @@ When you send an Avro-encoded message you can include the encoding schema with e
 ```
 schema:{
   "type":"record",
-  "name":"PreferredName",
+  "name":"StudentName",
   "fields":[
-    {"name":"first","type":"string"},
-    {"name":"last","type":"string"}
+    {"name":"first","type":["null","string"],"default": null},
+    {"name":"last","type":["null","string"],"default": null}
   ]
 },
 value:{
@@ -349,18 +391,50 @@ value:{
 
 This works, but it introduces a few problems. First, schemas don't change all that often, so including it with every message is redundant. And it increases the size of each message, which might affect how many messages you can store and how quickly they can be saved. The schema in our example is quite small, but imagine the complexity with larger schemas.
 
-A centralized Schema Registry solves these problems.
+A centralized service that stores and retrieves schemas solves these problems. Instead of the Producer including the full schema with each message, they can include only the schema's unique id. And when a Consumerreads a message, they can get the schema from the central service.
 
-- When Kafka reci
-- Producers add schemas to the registry via http
-- Messages include the schema's unique id, not the entire schema
-- Consumers can retrieve the schema from the registry via http
-
-The registry adds a new benefit as well. It will prevent a Producer from evolving a schema in an incompatible way.
+Confluent, a Kafka vendor run by the creators and maintainers of Kafka, provides an open source Schema Registry that does all of these things, and more.
 
 ### Demo
 
-- Sending and receiving a message using Schema Registry
+Following our last example we realize that our schema for Student Names is too permissive. We decide that last name can be optional, but first name is required. We create a new Producer
+
+```
+{
+  "type":"record",
+  "name":"StudentName",
+  "fields":[
+    {
+      "name": "first",
+      "type": "string"
+    },
+    {
+      "name": "last",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    }
+  ]
+}
+```
+
+Before we change our schema, we can ask the Schema Registry if our new version is compatible with our old one. If it's not then we could make all of our existing messages invalid.
+
+```
+curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data '{"schema": "{\"type\":\"record\",\"name\":\"StudentName\",\"fields\":[{\"name\": \"first\",\"type\": \"string\"},{\"name\": \"last\",\"type\": [\"null\",\"string\"],\"default\": null}]}"}' \
+http://schema-registry:8081/compatibility/subjects/names-value/versions/latest
+```
+
+This returns
+
+```
+{"is_compatible":false}
+```
+
+It's not compatible for the reason we mentioned earlier. If first name has been optional up until now, making it required going forward means that consumers using the new schema will not be able to read the old messages.
 
 ### Further Details
 - [Falsehoods Programmers Believe About Names](https://www.kalzumeus.com/2010/06/17/falsehoods-programmers-believe-about-names/)
