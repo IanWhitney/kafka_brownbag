@@ -212,7 +212,7 @@ How frequently a Consumer records its offset is configurable. A Consumer that do
 Further Details:
 - [Best Practices for Apache Kafka in Production](https://www.confluent.io/online-talk/best-practices-for-apache-kafka-in-production-confluent-online-talk-series)
 
-## Schemas
+## Schemas & Schema Registry
 
 So far we've sent strings and JSON in to Kafka, an in many cases this works well. But not always! Let's look at some pitfalls.
 
@@ -330,7 +330,7 @@ But if we try to send a message that violates the schema, it fails
 
 ```
 "2411242":{"last": null}
-org.apache.kafka.common.errors.SerializationException: Error deserializing json {"last": null} to Avro of schema {"type":"record","name":"StudentName","fields":[{"name":"first","type":["null","string"],"default":null},{"name":"last","type":["null","string"],"default":null}]}
+#org.apache.kafka.common.errors.SerializationException: Error deserializing json {"last": null} to Avro of schema {"type":"record","name":"StudentName","fields":[{"name":"first","type":["null","string"],"default":null},{"name":"last","type":["null","string"],"default":null}]}
 ```
 
 Let's take a look at the messages we've written to this topic. We can do this two different ways. First, we could use our plain Consumer that we were using for messages that didn't have schemas:
@@ -366,12 +366,6 @@ kafka-avro-console-consumer \
 
 Why do we get different responses? And what is this Schema Registry parameter we keep passing in?
 
-Further Details
-- [Avro]
-- [Schema Evolution]
-
-### Schema Registry
-
 When you send an Avro-encoded message you can include the encoding schema with every single message. In the Kafka topic, the message ends up looking like:
 
 ```
@@ -394,8 +388,6 @@ This works, but it introduces a few problems. First, schemas don't change all th
 A centralized service that stores and retrieves schemas solves these problems. Instead of the Producer including the full schema with each message, they can include only the schema's unique id. And when a Consumerreads a message, they can get the schema from the central service.
 
 Confluent, a Kafka vendor run by the creators and maintainers of Kafka, provides an open source Schema Registry that does all of these things, and more.
-
-### Demo
 
 Following our last example we realize that our schema for Student Names is too permissive. We decide that last name can be optional, but first name is required. We create a new Producer
 
@@ -442,6 +434,7 @@ It's not compatible for the reason we mentioned earlier. If first name has been 
 - [Schema evolution in Avro, Protocol Buffers and Thrift](http://martin.kleppmann.com/2012/12/05/schema-evolution-in-avro-protocol-buffers-thrift.html)
 - [Avro](https://avro.apache.org)
 - [Confluent Schema Registry](https://docs.confluent.io/current/schema-registry/docs/index.html)
+- [Yes, Virginia, You Really Do Need a Schema Registry](https://www.confluent.io/blog/schema-registry-kafka-stream-processing-yes-virginia-you-really-need-one/)
 
 ## Use Cases
 
