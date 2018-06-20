@@ -93,7 +93,7 @@ docker run \
 --rm confluentinc/cp-kafka:4.1.0 \
 kafka-console-consumer \
 --bootstrap-server kafka:9092 \
---topic test \
+--topic names \
 --from-beginning
 
 ## Schemas: Avro
@@ -168,7 +168,7 @@ docker run -it --net=confluent --rm confluentinc/cp-schema-registry:4.1.0 bash
 # Check compatibility of an invalid schema
 curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
   --data '{"schema": "{\"type\":\"record\",\"name\":\"StudentName\",\"fields\":[{\"name\": \"first\",\"type\": \"string\"},{\"name\": \"last\",\"type\": [\"null\",\"string\"],\"default\": null}]}"}' \
-http://schema-registry:8081/compatibility/subjects/names-value/versions/latest
+http://schema-registry:8081/compatibility/subjects/schema_names-value/versions/latest
 
 
 # Cleanup
