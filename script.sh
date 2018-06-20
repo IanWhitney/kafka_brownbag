@@ -25,7 +25,7 @@ confluentinc/cp-kafka:4.1.0
 
 ### Topics
 
-# Creates a test topic
+# Create a test topic
 docker run \
 --net=confluent \
 --rm confluentinc/cp-kafka:4.1.0 \
@@ -55,6 +55,10 @@ docker exec -i -t kafka /bin/bash
 kafka-console-producer \
 --broker-list kafka:9092 \
 --topic test
+
+# send some data to it
+# test message
+#{"json": "is neat"}
 
 ### Consumers
 
@@ -113,7 +117,7 @@ docker run -d \
   -e SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081 \
   confluentinc/cp-schema-registry:4.1.0
 
-## Create a shell in Schema Registry
+# Create a shell in Schema Registry
 docker run -it --net=confluent --rm confluentinc/cp-schema-registry:4.1.0 bash
 
 # Producer to send messages using Avro schema
@@ -129,17 +133,17 @@ kafka-avro-console-producer \
   --property key.schema='{"type":"string"}' \
   --property value.schema='{"type":"record","name":"PreferredName","fields":[{"name":"first","type":["null","string"],"default":null},{"name":"last","type":["null","string"],"default":null}]}'
 
-#Example good message:
-#"2411242":{"first": {"string": "Ian"}, "last": {"string": "Whitney}}
-#"2411242":{"first": null, "last": {"string": "Whitney}}
-#"2411242":{"first": {"string": "Ian"}, "last": null}
-#"2411242":{"first": null, "last": null}
+# Example good message:
+# "2411242":{"first": {"string": "Ian"}, "last": {"string": "Whitney}}
+# "2411242":{"first": null, "last": {"string": "Whitney}}
+# "2411242":{"first": {"string": "Ian"}, "last": null}
+# "2411242":{"first": null, "last": null}
 
-#Example bad message:
-#"2411242":{"last": null}
+# Example bad message:
+# "2411242":{"last": null}
 
-#Read a raw Avro message
-#Run this from your own terminal
+# Read a raw Avro message
+# Run this from your own terminal
 docker run \
   --net=confluent \
   --rm confluentinc/cp-kafka:4.1.0 \
@@ -150,8 +154,8 @@ docker run \
   --property key.separator=":" \
   --from-beginning
 
-#Read and decode a Avro message
-#Run this from your own terminal
+# Read and decode a Avro message
+# Run this from your own terminal
 docker run \
 --net=confluent \
 --rm confluentinc/cp-schema-registry:4.1.0 \
@@ -163,7 +167,7 @@ kafka-avro-console-consumer \
   --property key.separator=":" \
   --property schema.registry.url=http://schema-registry:8081
 
-## Create a shell in Schema Registry
+# Create a shell in Schema Registry
 docker run -it --net=confluent --rm confluentinc/cp-schema-registry:4.1.0 bash
 
 # Producer with an invalid schema

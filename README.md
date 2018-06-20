@@ -2,7 +2,7 @@
 
 ## Setup
 
-In the examples below I'll be using the [Confluent Docker Network environment](https://docs.confluent.io/current/installation/docker/docs/quickstart.html#docker-network). This provides a running Confluent Kafka system using Docker.
+In the examples below I'll be using the [Confluent Docker Network steps](https://docs.confluent.io/current/installation/docker/docs/quickstart.html#docker-network). This provides a running Confluent Kafka system using Docker.
 
 I'm running Docker using Docker for Mac.
 
@@ -43,17 +43,21 @@ At the end of the session I'll consider it a success if you:
 "The Log" in Kafka is a file on disk, like any other file you might have on your computers. There are two unique things about The Log, though.
 
 1. Kafka writes data to the log in the _same order_ it receives it.
-2. Kafka can not go back and change data already written to the log.
+2. Kafka _can not change_ data written to the log.
 
-These two things combine to make The Log very useful and powerful. If you write something that reads the log you don't have to worry about data ordering, because the data is already in order. And you don't have to worry about data changing after you read it, because it can't.
+These two things combine to make The Log very useful and powerful. If you're reading The Log you don't have to worry about data ordering, because the data is already in order. And you don't have to worry about data changing after you read it, because it can't.
 
 Further details: 
 - [The Log: What every software engineer should know about real-time data's unifying abstraction](https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying)
 - [Turning the Database Inside Out](https://martin.kleppmann.com/2015/03/04/turning-the-database-inside-out.html)
 
-#### Topics
+### Topics
 
-Data in The Log is organized in to topics. You can think of a topic like a table in a database, where all data in it has the same shape. Or you can think of a topic like a process, where the order of messages matters but the shape of each message may be different.
+Data in The Log is organized in to topics. You can think of a topic like a table in a database, where all data in it has the same shape. Or you can think of a topic like a series of steps, where the order of messages matters but the shape of each message may be different.
+
+An example of a table-like topic is Students. Each message in this topic would have the same attributes.
+
+An example of a series-like topic is placing an order. You pick something from a store, you pay with a credit card, a shipping invoice is created, etc. Each message would look different but they need to be in an exact order.
 
 For this quick introduction demo we're going to use a topic imaginatively named "test"
 
@@ -67,7 +71,7 @@ kafka-topics --create \
 --partitions 1 \
 --replication-factor 1 \
 --if-not-exists \
---zookeeper localhost:32181
+--zookeeper zookeeper:2181
 ```
 
 There's a lot in that command. Some highlights:
@@ -80,7 +84,7 @@ We can then ask Kafka for a list of our topics, just to make sure this worked
 
 ```
 kafka-topics --list \
---zookeeper localhost:32181
+--zookeeper zookeeper:2181
 ```
 
 `test` should appear in the list returned. There may be some others. Anything that starts with `__` is an internal topic used by Kafka.
@@ -94,7 +98,7 @@ Producers send messages to a Topic in Kafka. Producers can connect directly to K
 
 A "message" can be just about anything you want. A string, JSON, a binary-encoded bundle. Messages can also have a key, which comes in handy later when we talk about Retention.
 
-Kafka provides a high-level API for common Producer patterns called Kafka Connect. With Connect you can easily create Producers that import data from
+Kafka provides a high-level API for common Producer patterns called Kafka Connect. With Connect you can easily create Producers that import data in to Kafka from
 
 - Databases
 - Files
@@ -133,7 +137,11 @@ Further details:
 
 ### Consumers
 
-Consumers read messages from a Topic in Kafka. As with Producers, Consumers can connect directly to Kafka or they can use a HTTP proxy. What Consumers do with the messages is going to be up to each Consumer.
+Consumers read messages from a Topic in Kafka. They can start at the beginning of the Topic and read all messages, or they can start at the end and just read new messages. They make note of where they are in the topic, so that they don't read messages twice.
+
+Multiple Consumers can read the same messages topic. Reading a message does not destroy it.
+
+As with Producers, Consumers can connect directly to Kafka or they can use a HTTP proxy. What Consumers do with the messages is going to be up to each Consumer.
 
 Kafka Connect also provides an API for common Consumer patterns. With Connect you can create Consumers that take data from Kafka and put it into:
 
@@ -143,11 +151,11 @@ Kafka Connect also provides an API for common Consumer patterns. With Connect yo
 - Files
 - Message Queues
 
-Demo
+### Demo
 
 ```
 kafka-console-consumer \
---bootstrap-server localhost:29092 \
+--bootstrap-server kafka:9092 \
 --topic test \
 --from-beginning
 #test message
@@ -183,7 +191,9 @@ There are a few major retention options. You can retain data:
 - Until the topic reaches a certain size
 - Forever
 
-TODO: improve example since names is no longer introduced at this point. "Forever" can be done a couple of different ways.  In our topic of student names we could keep every version of the student's name, or we could keep only the _most current_ version of the student's name. This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
+"Forever" can be done a couple of different ways. Say we have a topic that contains your mailing address. We could set up a topic so that it retains, forever, every mailing address you've ever had. Or we could set up a topic to retain, forever, your _most recent_ mailing address.
+
+This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
 
 Further Details:
 - [Compacted Topics](https://dzone.com/articles/kafka-architecture-log-compaction)
@@ -199,13 +209,13 @@ So far we've talked about three kinds of processes: Kafka, Producers and Consume
 
 Kafka was written from the ground-up to be a fully distributed and reliable system, so many problems you've seen in distributed systems are handled.
 
-*What happens if a Kafka process dies?*: Kafka processes are run in 'clusters' with a leader and many followers. If a process dies, the remaining members of the cluster continue to handle the load. If the leader dies, a new leader is elected. If a majority of the processes die then the cluster stops accepting new messages.
+*What happens if a Kafka process dies?*: Kafka processes are run in 'clusters' with a leader and many followers. The processes aren't all on one server, they are spread across many servers in different data centers. If a process dies, the remaining members of the cluster continue to handle the load. If the leader dies, a new leader is elected. If a majority of the processes die then the cluster stops accepting new messages.
 
 *Can Producers send messages that are not logged?*: Generally, no. Producers can choose how strict they want to be. By default they wait for confirmation that at least one Kafka process has received a message before sending another. You can be more strict, or less. For example, you can configure a Producer to not wait for confirmation at all. This makes sense for Producers that are concerned with throughput over reliability. Or you can configure your Producer to wait for 3 confirmations before proceeding; your throughput will suffer, but no messages will be lost.
 
 This approach is generally true in Kafka -- you can tune Producers and Consumers to balance between throughput and reliability 
 
-*Can Consumers read the same message multiple times?*: As with Producers, the answer is "Generally, no." When a consumer reads a message it records its 'offset' in Kafka. Think of this like a bookmark, the consumer is saying "I've read this far." If the Consumer process dies and restarts then it can pick up right where it left off.
+*Can Consumers read the same message multiple times?*: As with Producers, the answer is, "Generally, no." When a consumer reads a message it records its 'offset' in Kafka. Think of this like a bookmark, the consumer is saying "I've read this far." If the Consumer process dies and restarts then it can pick up right where it left off.
 
 How frequently a Consumer records its offset is configurable. A Consumer that doesn't care if it accidentally reads a message twice can record its offsets less frequently. This will allow it to read messages more quickly. A Consumer that wants to read each message once can record its offset after every message. This Consumer will read more slowly, but with a guarantee that each message will be read once.
 
@@ -248,7 +258,7 @@ So, we decide to provide some structure and use JSON. Using our same Producer as
 
 Now Consumers can read the message, parse it as JSON and easily tell which is the first name and which is the last. Great! 
 
-But. We soon hit another problem. Some of our Consumers expect that first and last name will **always** be present. But, again, names are hard and nothing is guaranteed. So when a Producer sends through a message that has no last name, some of our Consumers break. Looks like we need a way to define what fields are required in our JSON, something like a Schema.
+But we soon hit another problem. Some of our Consumers expect that first and last name will **always** be present. But, again, names are hard and nothing is guaranteed. So when a Producer sends through a message that has no last name, some of our Consumers break. Looks like we need a way to define what fields are required in our JSON, something like a Schema.
 
 JSON offers no official support for schemas, no way to declare which values are required or optional or what kind of data each value should contain. There is a project to develop JSON schemas but it's a proposal, not official.
 
@@ -263,7 +273,7 @@ That last one is tricky. Imagine we start with a schema that declares both `last
 
 Schemas need to evolve over time and it turns out this is hard!
 
-There are a few different tools that solve this problem, but the one most commonly used in Kafka is Avro, an Apache project for data schemas, including their versioning and evolution. Many languages have Avro libraries that allow you to easily serialize and deserialize objects into and out of Avro encoding.
+There are a few different tools that solve this problem. The tool most commonly used in Kafka is Avro, an Apache project for managing data schemas, including their versioning and evolution. Many languages have Avro libraries that allow you to easily serialize and deserialize objects into and out of Avro encoding.
 
 I'm not going to dive deeply in to the details of Avro, there are links in the Further Details section. But we can see it in action with our Student Names topic:
 
@@ -326,7 +336,7 @@ With that running we can send a message that follows the schema:
 "2411242":{"first": null, "last": null}
 ```
 
-But if we try to send a message that violates the schema, it fails
+But if we try to send a message that violates the schema, it fails.
 
 ```
 "2411242":{"last": null}
@@ -348,7 +358,7 @@ kafka-console-consumer \
 #2411242:
 ```
 
-Or we can use a new Consumer that works with Avro messages:
+Or we can use a new Consumer that works with Avro messages and prints them in a nicer way:
 
 ```
 kafka-avro-console-consumer \
@@ -385,7 +395,7 @@ value:{
 
 This works, but it introduces a few problems. First, schemas don't change all that often, so including it with every message is redundant. And it increases the size of each message, which might affect how many messages you can store and how quickly they can be saved. The schema in our example is quite small, but imagine the complexity with larger schemas.
 
-A centralized service that stores and retrieves schemas solves these problems. Instead of the Producer including the full schema with each message, they can include only the schema's unique id. And when a Consumerreads a message, they can get the schema from the central service.
+A centralized service that stores and retrieves schemas solves these problems. Instead of the Producer including the full schema with each message, they can include only the schema's unique id. And when a Consumer reads a message, they can get the schema from the central service.
 
 Confluent, a Kafka vendor run by the creators and maintainers of Kafka, provides an open source Schema Registry that does all of these things, and more.
 
@@ -438,7 +448,7 @@ It's not compatible for the reason we mentioned earlier. If first name has been 
 
 ## Use Cases
 
-In my day to day work, I see many places where Kafka could be used on campus. After this brief intro you may see other options.
+In my day to day work I see many places where Kafka could be used on campus. After this brief intro you may see other options.
 
 ### Live ETL
 
@@ -460,7 +470,7 @@ How many people responded to your college's marketing email? What's the slowest 
 
 ### Integrations
 
-Vendor A can POST you JSON, Vendor B needs that data in XML. Kafka solves these problems well. Write a Producer that puts that JSON in to Kafka as Avro. Then write a Consumer to read the data and POST it back out in XML. Thanks to Avro and schemas you can be sure that the data always has the attributes you need.
+Vendor A can POST you JSON but Vendor B needs that data in XML. Kafka solves these problems well. Write a Producer that puts that JSON in to Kafka as Avro. Then write a Consumer to read the data and POST it back out in XML. Thanks to Avro and schemas you can be sure that the data always has the attributes you need.
 
 ## Current Implementation
 
@@ -493,6 +503,17 @@ So far we've implemented the parts of Kafka we need. But there are other tools t
 
 ### Authentication
 
+Kafka supports both TLS and Kerberos-based authentication. We have not yet turned on either, but would like to experiment with TLS authentication.
+
 ### Authorization
 
+Once authentication is in place, Kafka uses standard Access Control Lists to handle Authorization. Who can read data from what topic, etc.
+
 ### KSQL
+
+KSQL is a new part of the Kafka ecosystem that lets you query data in Kafka as if it were in a standard relational database. We need to upgrade our Kafka cluster to get KSQL support and we hope to do that soon.
+
+Further details: 
+- [Encryption and Authentication with SSL](https://docs.confluent.io/current/kafka/authentication_ssl.html)
+- [Authorization and ACLs](https://docs.confluent.io/current/kafka/authorization.html)
+- [KSQL In Action](https://www.confluent.io/blog/ksql-in-action-enriching-csv-events-with-data-from-rdbms-into-AWS/)
