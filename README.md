@@ -361,8 +361,8 @@ kafka-avro-console-producer \
 With that running we can send a message that follows the schema:
 
 ```
-"2411242":{"first": {"string": "Ian"}, "last": {"string": "Whitney}}
-"2411242":{"first": null, "last": {"string": "Whitney}}
+"2411242":{"first": {"string": "Ian"}, "last": {"string": "Whitney"}}
+"2411242":{"first": null, "last": {"string": "Whitney"}}
 "2411242":{"first": {"string": "Ian"}, "last": null}
 "2411242":{"first": null, "last": null}
 ```
