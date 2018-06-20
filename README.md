@@ -47,7 +47,7 @@ At the end of the session I'll consider it a success if you:
 
 These two things combine to make The Log very useful and powerful. If you're reading The Log you don't have to worry about data ordering, because the data is already in order. And you don't have to worry about data changing after you read it, because it can't.
 
-Further details: 
+*Further details*: 
 - [The Log: What every software engineer should know about real-time data's unifying abstraction](https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying)
 - [Turning the Database Inside Out](https://martin.kleppmann.com/2015/03/04/turning-the-database-inside-out.html)
 
@@ -61,7 +61,7 @@ An example of a series-like topic is placing an order. You pick something from a
 
 For this quick introduction demo we're going to use a topic imaginatively named "test"
 
-Demo:
+#### Demo
 
 Note: For the sake of focusing on Kafka I'm omitting some Docker commands from all of these examples. The full commands are in [`script.sh`](script.sh)
 
@@ -89,7 +89,7 @@ kafka-topics --list \
 
 `test` should appear in the list returned. There may be some others. Anything that starts with `__` is an internal topic used by Kafka.
 
-Further Details:
+*Further Details*:
 - [Apache Kafka: Topics and Logs](http://kafka.apache.org/intro#intro_topics)
 
 ### Producers
@@ -106,7 +106,7 @@ Kafka provides a high-level API for common Producer patterns called Kafka Connec
 
 We won't be diving in to Connect during this brownbag, but there are links in the Further Details section.
 
-Demo:
+### Demo
 
 We can send messages to our `test` topic in a variety of formats. We start a producer with
 
@@ -130,7 +130,7 @@ Or JSON:
 
 `ctrl-c` will end the producer console. But we'll leave it running for now so that we can see Producers and Consumers in action later on.
 
-Further details:
+*Further details*:
 - [Kafka Producer Architecture](https://dzone.com/articles/kafka-producer-architecture-picking-the-partition)
 - [Announcing Kafka Connect](https://www.confluent.io/blog/announcing-kafka-connect-building-large-scale-low-latency-data-pipelines/)
 - [Confluent: Kafka Connect](https://docs.confluent.io/current/connect/index.html)
@@ -151,13 +151,18 @@ Kafka Connect also provides an API for common Consumer patterns. With Connect yo
 - Files
 - Message Queues
 
-### Demo
+#### Demo
 
 ```
 kafka-console-consumer \
 --bootstrap-server kafka:9092 \
 --topic test \
 --from-beginning
+```
+
+And we should see our previously Produced messages appear:
+
+```
 #test message
 #{"json": "is neat"}
 ```
@@ -176,12 +181,12 @@ Then we will see that message appear over in our Consumer shell.
 #Data appears quickly
 ```
 
-Further details: 
+*Further details*: 
 - [Kafka Consumers: Reading Data from Kafka](https://www.safaribooksonline.com/library/view/kafka-the-definitive/9781491936153/ch04.html)
 - [Announcing Kafka Connect](https://www.confluent.io/blog/announcing-kafka-connect-building-large-scale-low-latency-data-pipelines/)
 - [Confluent: Kafka Connect](https://docs.confluent.io/current/connect/index.html)
 
-#### Retention
+### Retention
 
 Data in a topic can be stored for as long as you'd like. And any Consumer can read all data in a topic, regardless of if another Consumer has read it or how old the data is.
 
@@ -195,7 +200,7 @@ There are a few major retention options. You can retain data:
 
 This last option, where we keep the most recent state of a record, is called a "Compacted Topic". We're not going to talk deeply about this today, but there are links in the Further Details section.
 
-Further Details:
+*Further Details*:
 - [Compacted Topics](https://dzone.com/articles/kafka-architecture-log-compaction)
 
 ### Reliability
@@ -219,10 +224,10 @@ This approach is generally true in Kafka -- you can tune Producers and Consumers
 
 How frequently a Consumer records its offset is configurable. A Consumer that doesn't care if it accidentally reads a message twice can record its offsets less frequently. This will allow it to read messages more quickly. A Consumer that wants to read each message once can record its offset after every message. This Consumer will read more slowly, but with a guarantee that each message will be read once.
 
-Further Details:
+*Further Details*:
 - [Best Practices for Apache Kafka in Production](https://www.confluent.io/online-talk/best-practices-for-apache-kafka-in-production-confluent-online-talk-series)
 
-## Schemas & Schema Registry
+### Schemas & Schema Registry
 
 So far we've sent strings and JSON in to Kafka, an in many cases this works well. But not always! Let's look at some pitfalls.
 
@@ -277,7 +282,7 @@ There are a few different tools that solve this problem. The tool most commonly 
 
 I'm not going to dive deeply in to the details of Avro, there are links in the Further Details section. But we can see it in action with our Student Names topic:
 
-### Demo
+#### Demo
 
 We're going to create a new producer for our `names` topic. This one includes two schemas.
 
@@ -438,7 +443,7 @@ This returns
 
 It's not compatible for the reason we mentioned earlier. If first name has been optional up until now, making it required going forward means that consumers using the new schema will not be able to read the old messages.
 
-### Further Details
+*Further Details*:
 - [Falsehoods Programmers Believe About Names](https://www.kalzumeus.com/2010/06/17/falsehoods-programmers-believe-about-names/)
 - [JSON Schema](http://json-schema.org)
 - [Schema evolution in Avro, Protocol Buffers and Thrift](http://martin.kleppmann.com/2012/12/05/schema-evolution-in-avro-protocol-buffers-thrift.html)
@@ -513,7 +518,7 @@ Once authentication is in place, Kafka uses standard Access Control Lists to han
 
 KSQL is a new part of the Kafka ecosystem that lets you query data in Kafka as if it were in a standard relational database. We need to upgrade our Kafka cluster to get KSQL support and we hope to do that soon.
 
-Further details: 
+*Further details*: 
 - [Encryption and Authentication with SSL](https://docs.confluent.io/current/kafka/authentication_ssl.html)
 - [Authorization and ACLs](https://docs.confluent.io/current/kafka/authorization.html)
 - [KSQL In Action](https://www.confluent.io/blog/ksql-in-action-enriching-csv-events-with-data-from-rdbms-into-AWS/)
